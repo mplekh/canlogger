@@ -1,3 +1,11 @@
+/* Copyright (C) 2024 Maxim Plekh - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the GPLv3 license.
+ *
+ * You should have received a copy of the GPLv3 license with this file.
+ * If not, please visit : http://choosealicense.com/licenses/gpl-3.0/
+ */
+
 #include <iostream>
 #include <cstring>
 #include <cstdlib>

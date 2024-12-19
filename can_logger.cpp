@@ -1,3 +1,11 @@
+/* Copyright (C) 2024 Maxim Plekh - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the GPLv3 license.
+ *
+ * You should have received a copy of the GPLv3 license with this file.
+ * If not, please visit : http://choosealicense.com/licenses/gpl-3.0/
+ */
+
 #include <iostream>
 #include <cstring>
 #include <unistd.h>
@@ -9,8 +17,57 @@
 #include <sqlite3.h>
 #include <ctime>
 #include <vector>
+#include <cassert>
+#include "DDS/FastDDSPublisher.hpp"
 
-constexpr unsigned MIN_ENTRIES_TO_SEND = 100;
+constexpr int MIN_ENTRIES_TO_SEND = 100;
+
+using namespace eprosima::fastdds::dds;
+
+DomainParticipant* participant = nullptr;
+Publisher* publisher = nullptr;
+Topic* topic = nullptr;
+DataWriter* writer = nullptr;
+PubListener listener;
+
+bool initDDS()
+{
+    participant = DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
+    if (participant == nullptr) {
+        std::cerr << "Error creating participant." << std::endl;
+        return false;
+    }
+
+    TypeSupport myType = TypeSupport(new CanLogEntryPubSubType());
+    myType.register_type(participant);
+
+    topic = participant->create_topic("CanLoggerTopic", myType.get_type_name(), TOPIC_QOS_DEFAULT);
+    if (topic == nullptr) {
+        std::cerr << "Error creating topic." << std::endl;
+        return false;
+    }
+
+    publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT, nullptr, StatusMask::none());
+    if (publisher == nullptr) {
+        std::cerr << "Error creating publisher." << std::endl;
+        return false;
+    }
+
+    DataWriterQos wqos;
+    publisher->get_default_datawriter_qos(wqos);
+    wqos.reliability().kind = RELIABLE_RELIABILITY_QOS;
+    writer = publisher->create_datawriter(topic, wqos, &listener, StatusMask::all());
+    if (writer == nullptr) {
+        std::cerr << "Error creating writer." << std::endl;
+        return false;
+    }
+    return true;
+}
+
+void deleteDDS() {
+    if (participant) participant->delete_contained_entities();
+    DomainParticipantFactory::get_instance()->delete_participant(participant);
+}
 
 struct CanData {
     int can_id;
@@ -18,17 +75,22 @@ struct CanData {
     int64_t timestamp;
 };
 
-bool sockSend(const std::vector<CanData>& messages) {
-    // Dummy logic for now
+bool topicSend(const std::vector<CanData>& messages) {
     for (const auto& msg : messages) {
         std::cout << "Sending data: can_id=" << msg.can_id 
                   << ", value=" << msg.value 
                   << ", timestamp=" << msg.timestamp << std::endl;
+        CanLogEntry ddsmsg; //just one for now, FIXME
+        ddsmsg.can_id(msg.can_id);
+        ddsmsg.value(msg.value);
+        ddsmsg.timestamp(msg.timestamp);
+        writer->write(&ddsmsg);
     }
     return true;
 }
 
-static int fetchCallback(void* data, int argc, char** argv, char** azColName) {
+static int fetchCallback(void* data, int argc, char** argv, char**) {
+    assert(argc==4);
     std::vector<CanData>* messages = static_cast<std::vector<CanData>*>(data);
 
     CanData msg;
@@ -45,7 +107,7 @@ bool wlanAvailable() {
 }
 
 bool uploadData(sqlite3* db) {
-    if (!wlanAvailable()) return false;
+    if (listener.matched == 0) return false;
 
     std::vector<CanData> messages;
     char* errorMessage = nullptr;
@@ -55,7 +117,7 @@ bool uploadData(sqlite3* db) {
         sqlite3_free(errorMessage);
         return false;
     }
-    return sockSend(messages);
+    return topicSend(messages);
 }
 
 void printData(CanData entry) {
@@ -191,6 +253,10 @@ int main() {
         perror("Bind");
         return 1;
     }
+    if (!initDDS()) {
+        std::cerr << "DDS init error" << std::endl;
+        return 1;
+    }
 
     // CAN frame buffer
     struct can_frame frame;
@@ -219,6 +285,7 @@ int main() {
     }
 
     // never reach here in this version
+    deleteDDS();
     sqlite3_close(db);
     close(s);
     return 0;

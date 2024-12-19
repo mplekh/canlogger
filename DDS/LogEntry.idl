@@ -1,0 +1,7 @@
+struct CanLogEntry
+{
+	unsigned long index;
+	octet can_id;
+	long value;
+	long long timestamp;
+};
