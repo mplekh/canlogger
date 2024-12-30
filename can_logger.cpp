@@ -80,7 +80,7 @@ bool topicSend(const std::vector<CanData>& messages) {
         std::cout << "Sending data: can_id=" << msg.can_id 
                   << ", value=" << msg.value 
                   << ", timestamp=" << msg.timestamp << std::endl;
-        CanLogEntry ddsmsg; //just one for now, FIXME
+        CanLogEntry ddsmsg;
         ddsmsg.can_id(msg.can_id);
         ddsmsg.value(msg.value);
         ddsmsg.timestamp(msg.timestamp);
