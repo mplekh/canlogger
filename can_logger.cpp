@@ -56,6 +56,9 @@ bool initDDS()
     DataWriterQos wqos;
     publisher->get_default_datawriter_qos(wqos);
     wqos.reliability().kind = RELIABLE_RELIABILITY_QOS;
+    wqos.history().kind = KEEP_ALL_HISTORY_QOS;
+    wqos.resource_limits().max_samples = 1000;  // Adjust based on expected load
+    wqos.resource_limits().allocated_samples = 200;
     writer = publisher->create_datawriter(topic, wqos, &listener, StatusMask::all());
     if (writer == nullptr) {
         std::cerr << "Error creating writer." << std::endl;
