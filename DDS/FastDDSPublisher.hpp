@@ -19,10 +19,10 @@ struct PubListener : public eprosima::fastdds::dds::DataWriterListener {
             const eprosima::fastdds::dds::PublicationMatchedStatus& info) override
     {
         if (info.current_count_change == 1) {
-            matched = info.total_count;
+            matched = info.current_count;
             std::cout << "Publisher matched." << std::endl;
         } else if (info.current_count_change == -1) {
-            matched = info.total_count;
+            matched = info.current_count;
             std::cout << "Publisher unmatched." << std::endl;
         } else {
             std::cout << info.current_count_change
